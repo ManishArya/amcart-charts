@@ -36,3 +36,58 @@ spec:
     kind: ClusterIssuer
     name: letsencrypt-prod
   secretName: amcart-tls-secret
+---
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+ name: root-gateway
+ namespace: istio-ingress
+spec:
+ selector:
+   istio: ingressgateway
+ servers:
+  - port:
+     number: 443
+     name: https
+     protocol: HTTPS
+    tls:
+     mode: SIMPLE
+     credentialName: amcart-tls-secret
+    hosts:
+    - 'amcart-api.centralus.cloudapp.azure.com'
+---
+  apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+   name: amcart-server
+   namespace: amcart
+spec:
+   hosts:
+   - 'amcart-api.centralus.cloudapp.azure.com'
+   gateways:
+   - istio-ingress/root-gateway
+   http:
+   - match:
+     - uri:
+         prefix: /api/v1/search
+     route:
+     - destination:
+         host: search-api-svc.amcart.svc.cluster.local
+         port:
+           number: 8080
+       retries:
+        attempts: 3                
+        perTryTimeout: 100s          
+        retryOn: 5xx, gateway-error, connect-failure,refused-stream
+   - match:
+     - uri:
+         prefix: /api/v1/products
+     route:
+     - destination:
+         host: product-api-svc.amcart.svc.cluster.local
+         port:
+           number: 8080
+       retries:
+        attempts: 3                
+        perTryTimeout: 100s          
+        retryOn: 5xx, gateway-error, connect-failure,refused-stream
